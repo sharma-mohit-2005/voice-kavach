@@ -1,0 +1,188 @@
+{
+  "calibration_id": "cal-2026-09-06-heuristic-v1",
+  "model_version": "vif-heuristic-v1.0 (SSL/AASIST + ECAPA plug-in ready)",
+  "audio": {
+    "target_sr": 16000,
+    "max_seconds": 60,
+    "min_seconds": 1.0,
+    "window_seconds": 3.0,
+    "hop_seconds": 0.5
+  },
+  "logistic": {
+    "bias": -2.0,
+    "scale": 1.0
+  },
+  "cues": {
+    "flat_pitch": {
+      "feature": "f0_std_st",
+      "dir": "down",
+      "lo": 0.3,
+      "hi": 0.95,
+      "weight": 1.3,
+      "label": "Pitch range",
+      "risk": "Pitch contour is unnaturally flat ({v:.2f} semitones of movement) - typical of neural TTS",
+      "ok": "Natural pitch movement ({v:.2f} semitones)"
+    },
+    "low_jitter": {
+      "feature": "jitter_pct",
+      "dir": "down",
+      "lo": 0.15,
+      "hi": 0.45,
+      "weight": 1.3,
+      "label": "Pitch micro-variation",
+      "risk": "Near-zero cycle-to-cycle pitch wobble (jitter {v:.2f}%) - vocal folds are never this regular",
+      "ok": "Human-like pitch micro-variation (jitter {v:.2f}%)"
+    },
+    "low_shimmer": {
+      "feature": "shimmer_pct",
+      "dir": "down",
+      "lo": 1.5,
+      "hi": 5.0,
+      "weight": 0.5,
+      "label": "Amplitude micro-variation",
+      "risk": "Amplitude micro-variation is almost absent (shimmer {v:.2f}%)",
+      "ok": "Normal amplitude micro-variation (shimmer {v:.2f}%)"
+    },
+    "high_periodicity": {
+      "feature": "hnr_db",
+      "dir": "up",
+      "lo": 6.6,
+      "hi": 8.6,
+      "weight": 0.6,
+      "label": "Harmonic purity",
+      "risk": "Harmonics are unnaturally clean ({v:.1f} dB) - little breath or turbulence noise",
+      "ok": "Breath and turbulence noise present ({v:.1f} dB)"
+    },
+    "hf_missing": {
+      "feature": "hf_ratio_pct",
+      "dir": "down",
+      "lo": 1.5,
+      "hi": 6.5,
+      "weight": 0.9,
+      "gate": "wideband",
+      "label": "Energy above 4 kHz",
+      "risk": "Very little energy above 4 kHz ({v:.2f}%) - fricatives are under-rendered, vocoder-like",
+      "ok": "Full-band fricative energy above 4 kHz ({v:.2f}%)"
+    },
+    "band_cliff": {
+      "feature": "cliff_db",
+      "dir": "up",
+      "lo": 15.0,
+      "hi": 32.0,
+      "weight": 1.1,
+      "gate": "wideband",
+      "label": "Synthetic band ceiling",
+      "risk": "Hard band ceiling mid-spectrum ({v:.0f} dB step) - a generator/vocoder cut-off, not a microphone",
+      "ok": "No artificial band cut-off ({v:.0f} dB step)"
+    },
+    "no_pauses": {
+      "feature": "pause_ratio",
+      "dir": "down",
+      "lo": 0.04,
+      "hi": 0.16,
+      "weight": 0.9,
+      "label": "Breathing pauses",
+      "risk": "Almost no natural pauses ({v:.0%} of the clip) - continuous, un-breathing delivery",
+      "ok": "Natural pausing ({v:.0%} of the clip)"
+    },
+    "weak_modulation": {
+      "feature": "mod_ratio",
+      "dir": "down",
+      "lo": 0.15,
+      "hi": 0.45,
+      "weight": 1.2,
+      "label": "Syllabic rhythm",
+      "risk": "Weak 2-8 Hz syllabic rhythm ({v:.2f}) - the delivery is a continuous drone",
+      "ok": "Speech-like syllabic rhythm ({v:.2f})"
+    },
+    "flat_spectrum": {
+      "feature": "flatness",
+      "dir": "up",
+      "lo": 0.25,
+      "hi": 0.55,
+      "weight": 0.9,
+      "label": "Spectral flatness",
+      "risk": "Noise-like flat spectrum ({v:.2f}) - consistent with a loudspeaker replay or heavy compression",
+      "ok": "Harmonic spectral structure ({v:.2f})"
+    },
+    "noisy_channel": {
+      "feature": "noise_floor_db",
+      "dir": "up",
+      "lo": -45.0,
+      "hi": -30.0,
+      "weight": 0.9,
+      "label": "Channel noise",
+      "risk": "Loud background floor ({v:.0f} dBFS) - open-air capture or a replayed recording",
+      "ok": "Clean capture path ({v:.0f} dBFS floor)"
+    },
+    "clean_silence": {
+      "feature": "noise_floor_db",
+      "dir": "down",
+      "lo": -95.0,
+      "hi": -72.0,
+      "weight": 0.6,
+      "gate": "has_pauses",
+      "label": "Silence purity",
+      "risk": "Silences are digitally clean ({v:.0f} dBFS) - no room or handset noise at all",
+      "ok": "Room/handset noise floor present ({v:.0f} dBFS)"
+    }
+  },
+  "prosody_cues": [
+    "flat_pitch",
+    "low_jitter",
+    "low_shimmer",
+    "weak_modulation",
+    "no_pauses"
+  ],
+  "fusion": {
+    "with_reference": {
+      "spoof": 0.7,
+      "mismatch": 0.2,
+      "prosody": 0.1
+    },
+    "without_reference": {
+      "spoof": 0.85,
+      "prosody": 0.15
+    },
+    "context_boost": {
+      "high_value": 5,
+      "privileged": 3,
+      "normal": 0
+    }
+  },
+  "thresholds": {
+    "high_value": {
+      "red": 65,
+      "amber": 38
+    },
+    "privileged": {
+      "red": 72,
+      "amber": 46
+    },
+    "normal": {
+      "red": 80,
+      "amber": 55
+    }
+  },
+  "escalations": {
+    "speaker_mismatch": {
+      "match_below": 45,
+      "contexts": [
+        "high_value",
+        "privileged"
+      ],
+      "min_band": "amber",
+      "reason": "Voice does not match the enrolled reference - escalated regardless of the spoof score, because a mismatch and a clone are both grounds to step up."
+    }
+  },
+  "speaker": {
+    "dist_scale": 0.55,
+    "pitch_scale_st": 9.0,
+    "channel_mismatch_hz": 1800
+  },
+  "actions": {
+    "red": "BLOCK the request. Call back on the registered number and require a dynamic second factor (push-approve / FIDO). Never release funds or credentials on this call.",
+    "amber": "STEP UP before anything moves. Independent callback plus a dynamic second factor; treat caller ID as untrusted.",
+    "green": "PROCEED under your normal policy - voice is only a contextual signal, and the RBI-mandated dynamic second factor still applies."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "note": "Synthetic demo pack - no real voices were recorded or cloned. Replace any file with a consented recording and the app picks it up.",
+  "samples": [
+    {
+      "file": "real_en.wav",
+      "label": "CEO - genuine (EN)",
+      "expect_band": "green",
+      "story": "The real CEO calls the CFO about a payment.",
+      "kind": "genuine"
+    },
+    {
+      "file": "clone_en.wav",
+      "label": "CEO - cloned (EN)",
+      "expect_band": "red",
+      "story": "Same script, synthesised voice asking for a Rs 10L transfer.",
+      "kind": "clone"
+    },
+    {
+      "file": "real_hi.wav",
+      "label": "CEO - genuine (HI)",
+      "expect_band": "green",
+      "story": "Hindi call from the genuine speaker.",
+      "kind": "genuine"
+    },
+    {
+      "file": "clone_hi.wav",
+      "label": "CEO - cloned (HI)",
+      "expect_band": "red",
+      "story": "Hindi clone - the separation must hold outside English.",
+      "kind": "clone"
+    },
+    {
+      "file": "replay_noisy.wav",
+      "label": "Replay over speakerphone",
+      "expect_band": "amber",
+      "story": "A genuine recording replayed down a noisy phone line.",
+      "kind": "replay"
+    },
+    {
+      "file": "wrong_speaker.wav",
+      "label": "Different real person",
+      "expect_band": "green",
+      "story": "A real human, but not the enrolled speaker - use as reference to fail the match leg.",
+      "kind": "genuine",
+      "use_as_reference": true
+    },
+    {
+      "file": "clone_phone_8k.wav",
+      "label": "Clone on an 8 kHz phone leg",
+      "expect_band": "amber",
+      "story": "The same clone as it arrives from Twilio/Asterisk: G.711 mu-law, 8 kHz. Half the evidence is gone with the top 4 kHz, so the system escalates instead of over-claiming - and the callback still stops the fraud.",
+      "kind": "clone"
+    }
+  ]
+}

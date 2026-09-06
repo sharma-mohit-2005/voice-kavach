@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Voice Integrity Verification</title>
+<link rel="stylesheet" href="/static/styles.css"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#128737;</text></svg>"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">V</span>
+    <span>Voice Integrity Verification<small id="brandSub">prototype - not a certified detector</small></span>
+  </div>
+  <span class="topbar-spacer"></span>
+  <span class="chip chip-dot" id="healthChip">connecting…</span>
+</header>
+
+<!-- ============================ LANDING: the drop surface, nothing else -->
+<main class="landing" id="landing">
+  <div class="landing-inner">
+    <h1>Is this voice <em>real</em>?</h1>
+    <p class="lede">
+      Drop a call recording and get a spoof-risk score, the evidence behind it,
+      and the action to take - in a couple of seconds, entirely on this machine.
+    </p>
+
+    <button class="drop" id="drop" type="button" aria-describedby="dropHelp">
+      <span class="drop-icon" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4M12 4 7 9M12 4l5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+        </svg>
+      </span>
+      <span class="drop-title">Drop a voice clip here</span>
+      <span class="drop-sub" id="dropHelp">
+        <b>wav</b>, <b>mp3</b>, <b>m4a</b>, <b>ogg</b> or <b>webm</b> &middot; up to 60 seconds<br/>
+        Scored in memory and discarded - the audio never leaves this machine.
+      </span>
+      <span class="drop-cta">Choose a file</span>
+    </button>
+
+    <p class="landing-alt">
+      or <button class="linkbtn" id="recBtn" type="button">record 8 seconds</button>
+      &middot; <button class="linkbtn" id="sampleBtn" type="button">try a demo call</button>
+      <span id="recStatus"></span>
+    </p>
+
+    <p class="landing-foot">
+      Voice is a <b>signal</b>, never an approval. A matching voice still requires the
+      dynamic second factor mandated by the RBI 2025 authentication directions.
+    </p>
+  </div>
+</main>
+
+<!-- ========================================== WORKSPACE: appears on drop -->
+<main class="workspace" id="workspace" hidden>
+  <div class="ws-head">
+    <span class="filechip">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M7 7v10M17 7v10M2 11v2M22 11v2"/></svg>
+      <span>
+        <span class="name" id="fileName">-</span>
+        <span class="meta" id="fileMeta"></span>
+      </span>
+    </span>
+    <button class="ghost" id="resetBtn" type="button">Analyse another clip</button>
+    <span class="topbar-spacer"></span>
+    <button class="ghost" id="sampleBtn2" type="button">Demo calls</button>
+  </div>
+
+  <div class="grid">
+    <!-- ------------------------------------------------------- controls -->
+    <section>
+      <div class="card">
+        <h2>Call context</h2>
+        <div class="field">
+          <div class="seg" id="ctxSeg" role="group" aria-label="Transaction context"></div>
+        </div>
+        <div class="field">
+          <label for="lang">Language</label>
+          <select id="lang"></select>
+        </div>
+        <div class="field">
+          <label for="refDrop">Enrolled reference voice <span style="color:var(--faint)">(optional)</span></label>
+          <button class="refdrop" id="refDrop" type="button">
+            <span id="refLabel">Drop a genuine sample of the claimed speaker</span>
+          </button>
+        </div>
+        <button class="primary" id="analyzeBtn" type="button">Analyse</button>
+        <p class="privacy">
+          No database, no temp files: the clip is decoded in memory, scored, and dropped.
+          Only the numbers you see are kept, in this browser, until you clear them.
+        </p>
+      </div>
+
+      <div class="card" id="historyCard" hidden>
+        <h2>This session</h2>
+        <ul class="history" id="history"></ul>
+        <button class="ghost" id="clearHistory" type="button" style="margin-top:12px;width:100%">
+          Delete session history
+        </button>
+      </div>
+    </section>
+
+    <!-- -------------------------------------------------------- results -->
+    <section id="results" aria-live="polite">
+      <div class="card verdict-card" id="verdictCard">
+        <div class="verdict-top">
+          <div class="gauge" id="gauge"></div>
+          <div class="verdict-text">
+            <div class="verdict-name" id="verdictName">Ready</div>
+            <div class="verdict-sub" id="verdictSub">Press Analyse to score this clip.</div>
+            <div class="badges" id="badges"></div>
+          </div>
+        </div>
+        <div class="action" id="actionBox" hidden>
+          <strong id="actionLabel">Recommended action</strong>
+          <span id="actionText"></span>
+          <div class="escalation" id="escalationText" hidden></div>
+        </div>
+        <div class="scores" id="scores" hidden>
+          <div class="score">
+            <div class="k">Spoof score</div>
+            <div class="v" id="spoofV">-</div>
+            <div class="bar"><i id="spoofB" style="width:0"></i></div>
+            <div class="note">Synthetic-speech evidence, calibrated 0-100.</div>
+          </div>
+          <div class="score">
+            <div class="k">Speaker match</div>
+            <div class="v" id="matchV">-</div>
+            <div class="bar"><i id="matchB" style="width:0"></i></div>
+            <div class="note" id="matchNote">Add a reference voice to score this leg.</div>
+          </div>
+          <div class="score">
+            <div class="k">Prosody anomaly</div>
+            <div class="v" id="prosV">-</div>
+            <div class="bar"><i id="prosB" style="width:0"></i></div>
+            <div class="note">Side-channel only - never a verdict on its own.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="chartCard" hidden>
+        <h2>Risk over the call <span style="text-transform:none;letter-spacing:0" id="chartMeta"></span></h2>
+        <svg class="chart" id="chart" viewBox="0 0 720 150" preserveAspectRatio="none" role="img"
+             aria-label="Waveform with sliding-window spoof score"></svg>
+        <div class="legend">
+          <span><i style="background:#2c3d5e"></i>waveform</span>
+          <span><i style="background:var(--accent)"></i>spoof score per 3 s window</span>
+          <span><i style="background:var(--amber)"></i>step-up threshold</span>
+          <span><i style="background:var(--red)"></i>block threshold</span>
+        </div>
+      </div>
+
+      <div class="card" id="detailCard" hidden>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="why">Why</button>
+          <button role="tab" aria-selected="false" data-tab="measures">Measurements</button>
+          <button role="tab" aria-selected="false" data-tab="json">JSON</button>
+        </div>
+        <div id="tab-why"><ul class="cues" id="cues"></ul></div>
+        <div id="tab-measures" hidden><div class="kv" id="kv"></div></div>
+        <div id="tab-json" hidden><pre class="json" id="json"></pre></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ------------------------------------------------------------- sheets -->
+<div class="sheet" id="sampleSheet" hidden role="dialog" aria-modal="true" aria-label="Demo calls">
+  <div class="sheet-inner">
+    <h3>Demo calls</h3>
+    <p class="sub" id="sampleNote">One click loads the clip and scores it.</p>
+    <div class="samples" id="samples">Loading…</div>
+    <button class="ghost" id="closeSheet" type="button" style="margin-top:16px;width:100%">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden><div>Drop to analyse</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" hidden/>
+<input type="file" id="refInput" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" hidden/>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

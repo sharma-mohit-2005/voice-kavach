@@ -1,0 +1,87 @@
+# ---------------------------------------------------------------- Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ---------------------------------------------------------------- secrets
+# Nothing in this app needs a key today, but keep the habit before the
+# Twilio / Bhashini integrations land.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# --------------------------------------------------- local config overrides
+# config.json IS tracked - it holds the calibration the demo depends on.
+# Personal threshold experiments go in a local copy instead.
+config.local.json
+config.*.local.json
+
+# ------------------------------------------------------------ model weights
+# The AASIST / ECAPA / wav2vec2 upgrade pulls in checkpoints far too large
+# for git. Keep them out from day one.
+models/
+weights/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.h5
+
+# --------------------------------------------------------------- audio data
+# samples/*.wav and samples/manifest.json ARE tracked: the README promises a
+# fresh clone can run the demo, and they are synthetic (no real voices).
+#
+# Real recordings must never be committed - consent, DPDP data minimisation,
+# and the app's own "no audio stored" claim all say so. Put any consented
+# human recordings here and they stay local:
+samples/private/
+recordings/
+uploads/
+tmp/
+*.tmp.wav
+
+# ------------------------------------------------------------------ editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# ----------------------------------------------------------------------- OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ---------------------------------------------------------------- run-time
+*.log
+logs/
+.uvicorn.pid
