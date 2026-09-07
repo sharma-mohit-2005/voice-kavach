@@ -33,6 +33,20 @@ MAX_UPLOAD_MB = 25
 app = FastAPI(title="Voice Integrity Verification", version=detector.CONFIG["model_version"])
 
 
+@app.middleware("http")
+async def no_cache(request, call_next):
+    """Never let a browser serve a stale page, stylesheet or script.
+
+    StaticFiles sends only etag/last-modified, so browsers fall back to
+    heuristic caching and keep serving an old app.js after an edit - which
+    looks exactly like "the app is broken". On a demo we always want fresh.
+    """
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+    return response
+
+
 def _cfg() -> dict:
     """Re-read config.json per request so thresholds can be tuned live."""
     try:
@@ -48,7 +62,19 @@ def _error(message: str, hint: str = "", code: int = 400):
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return (STATIC / "index.html").read_text(encoding="utf-8")
+    """Serve the page with mtime-stamped asset URLs.
+
+    Browsers (and preview panes) hold app.js/styles.css in memory cache even
+    with no-store, so an edit silently does nothing and the app looks broken.
+    Stamping each URL with the file's modification time makes a stale asset
+    impossible: edit the file, reload, get the new one.
+    """
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    for asset in ("app.js", "styles.css"):
+        path = STATIC / asset
+        if path.exists():
+            html = html.replace(f"/static/{asset}", f"/static/{asset}?v={int(path.stat().st_mtime)}")
+    return html
 
 
 @app.get("/api/health")

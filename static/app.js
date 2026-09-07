@@ -224,8 +224,18 @@ async function acceptFile(file, { asReference = false, autoRun = true } = {}) {
   if (autoRun) analyze();
 }
 
+/* The landing section is `#detector` in the current markup and was `#landing`
+   before the redesign. Resolve it by either name (and fall back to the class)
+   so a rename in index.html can never null out showWorkspace() again. */
+function landingEl() {
+  return document.getElementById('detector')
+      || document.getElementById('landing')
+      || document.querySelector('.landing');
+}
+
 function showWorkspace() {
-  $('landing').hidden = true;
+  const landing = landingEl();
+  if (landing) landing.hidden = true;
   $('workspace').hidden = false;
   $('workspace').classList.add('fade-in');
 }
@@ -267,7 +277,8 @@ $('resetBtn').onclick = () => {
   if (thinkingCard) thinkingCard.hidden = true;
   state.file = null; state.ref = null; state.last = null;
   $('refLabel').textContent = 'Drop a genuine sample of the claimed speaker';
-  $('landing').hidden = false;
+  const landing = landingEl();
+  if (landing) landing.hidden = false;
   $('workspace').hidden = true;
   ['actionBox', 'scores', 'chartCard', 'detailCard'].forEach((id) => { $(id).hidden = true; });
   $('verdictName').textContent = 'Ready';
