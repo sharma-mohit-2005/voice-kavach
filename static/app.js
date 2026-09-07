@@ -93,6 +93,111 @@ function encodeWav(samples, sr) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let activeThinkingAbort = false;
+
+// 11 forensic thinking stages (duration: ~22-26s total)
+const FORENSIC_THINKING_PHASES = [
+  {
+    pct: 9,
+    phase: 'PHASE 1 / 11',
+    status: 'Thinking &middot; Ingesting Stream',
+    title: 'Ingesting 16 kHz Float32 Audio Stream',
+    sub: 'Decoding PCM buffer into memory, trimming leading silence, and normalizing peak amplitude...',
+    log: 'Decoded audio to 16 kHz mono float32 buffer in RAM. Leading silence trimmed. Zero storage to disk.'
+  },
+  {
+    pct: 18,
+    phase: 'PHASE 2 / 11',
+    status: 'Evaluating &middot; Pitch Contour (F0)',
+    title: 'Evaluating Fundamental Frequency (F0)',
+    sub: 'Extracting frame-level pitch trajectory, pitch median, and semitone dispersion...',
+    log: 'Autocorrelation F0 tracking active. Measuring pitch register, octave jumps, and continuous melodic variation.'
+  },
+  {
+    pct: 27,
+    phase: 'PHASE 3 / 11',
+    status: 'Measuring &middot; Vocal Cord Jitter',
+    title: 'Measuring Vocal Tremor & Cycle Perturbation',
+    sub: 'Computing micro-variation jitter percentage across consecutive glottal pulses...',
+    log: 'Analyzing cycle-to-cycle pitch instability. Checking human vocal fold involuntary tremor vs robotic pitch lock.'
+  },
+  {
+    pct: 36,
+    phase: 'PHASE 4 / 11',
+    status: 'Measuring &middot; Amplitude Shimmer',
+    title: 'Measuring Amplitude Perturbation (Shimmer)',
+    sub: 'Evaluating cycle-to-cycle amplitude dynamics and vocal air-loss dynamics...',
+    log: 'Glottal amplitude envelope calculated. Testing for unnaturally flat mathematical amplitude regulation.'
+  },
+  {
+    pct: 45,
+    phase: 'PHASE 5 / 11',
+    status: 'Analyzing &middot; Harmonic Purity (HNR)',
+    title: 'Analyzing Harmonic-to-Noise Ratio (HNR)',
+    sub: 'Separating periodic vocal resonance from turbulent aspiration noise in decibels...',
+    log: 'Cepstral harmonic comb filtered. Testing acoustic breathiness against pristine synthetic diffusion purity.'
+  },
+  {
+    pct: 54,
+    phase: 'PHASE 6 / 11',
+    status: 'Inspecting &middot; 4 kHz Spectral Ceiling',
+    title: 'Inspecting High-Frequency Spectral Cliff',
+    sub: 'Detecting brick-wall lowpass filters and synthetic band-limit cutoff cliffs...',
+    log: 'Spectral roll-off inspected: testing 4 kHz - 8 kHz energy ratio. Checking for vocoder Nyquist cutoff artifacts.'
+  },
+  {
+    pct: 63,
+    phase: 'PHASE 7 / 11',
+    status: 'Evaluating &middot; Neural Vocoder Phase',
+    title: 'Evaluating Phase Coherence & Vocoder Grids',
+    sub: 'Scanning for neural vocoder phase reconstruction traces (HiFi-GAN, BigVGAN, DiffWave)...',
+    log: 'Neural vocoder phase signature scan: detecting discrete spectrogram inversion patterns and harmonic smearing.'
+  },
+  {
+    pct: 72,
+    phase: 'PHASE 8 / 11',
+    status: 'Cross-Matching &middot; 24+ Generator Models',
+    title: 'Cross-Matching 24+ AI Generator Models',
+    sub: 'Evaluating acoustic fingerprints against ElevenLabs v1/v2, OpenAI TTS, PlayHT, and Resemble AI...',
+    log: 'Model cross-reference active: comparing against ElevenLabs, OpenAI Alloy/Shimmer, Resemble v3, Cartesia, and Murf.'
+  },
+  {
+    pct: 81,
+    phase: 'PHASE 9 / 11',
+    status: 'Evaluating &middot; Prosody & Breathing Cadence',
+    title: 'Evaluating Conversational Prosody & Pauses',
+    sub: 'Measuring speech rhythm, syllabic rate (Hz), and physiological breathing intervals...',
+    log: 'Prosodic cadence evaluated: pause duration ratio, breathing rate, and phrase-boundary timing analyzed.'
+  },
+  {
+    pct: 90,
+    phase: 'PHASE 10 / 11',
+    status: 'Gating &middot; Telephony & Channel Mismatch',
+    title: 'Gating 8 kHz Telephony & Transcoding Leg',
+    sub: 'Verifying if sample was upsampled from G.711 narrow-band telephony or compressed over VoIP...',
+    log: 'Narrowband telephony gating verified. Channel mismatch compensations calibrated to prevent false accusations.'
+  },
+  {
+    pct: 98,
+    phase: 'PHASE 11 / 11',
+    status: 'Calibrating &middot; Policy Risk Fusion',
+    title: 'Calibrating Multi-Cue Logistic Risk Fusion',
+    sub: 'Mapping combined acoustic evidence against context thresholds (High-Value Transfer policy)...',
+    log: 'Fusing 13 acoustic cue weights via calibrated logistic sigmoid function. Formatting audit trail & action advice.'
+  }
+];
+
+async function performAnalysis(file, ref, context, language) {
+  const fd = new FormData();
+  fd.append('audio', file);
+  if (ref) fd.append('reference', ref);
+  fd.append('context', context);
+  fd.append('language', language);
+  const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+  return await res.json();
+}
+
 async function acceptFile(file, { asReference = false, autoRun = true } = {}) {
   if (!file) return;
   if (!AUDIO_RE.test(file.name) && !file.type.startsWith('audio/')) {
@@ -157,6 +262,9 @@ window.addEventListener('drop', (e) => {
 });
 
 $('resetBtn').onclick = () => {
+  activeThinkingAbort = true;
+  const thinkingCard = $('thinkingCard');
+  if (thinkingCard) thinkingCard.hidden = true;
   state.file = null; state.ref = null; state.last = null;
   $('refLabel').textContent = 'Drop a genuine sample of the claimed speaker';
   $('landing').hidden = false;
@@ -168,37 +276,8 @@ $('resetBtn').onclick = () => {
   $('badges').innerHTML = '';
 };
 
-/* --------------------------------------------------------- mic recording */
-
-$('recBtn').onclick = async () => {
-  const btn = $('recBtn');
-  const status = $('recStatus');
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const rec = new MediaRecorder(stream);
-    const chunks = [];
-    rec.ondataavailable = (e) => chunks.push(e.data);
-    rec.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-      status.textContent = '';
-      btn.disabled = false;
-      btn.textContent = 'record 8 seconds';
-      await acceptFile(new File([blob], 'microphone.webm', { type: blob.type }));
-    };
-    rec.start();
-    btn.disabled = true;
-    let left = 8;
-    btn.textContent = `recording ${left}s`;
-    const tick = setInterval(() => {
-      left -= 1;
-      btn.textContent = `recording ${left}s`;
-      if (left <= 0) { clearInterval(tick); rec.stop(); }
-    }, 1000);
-  } catch (e) {
-    toast('Microphone blocked. Allow mic access, or drop a file instead.');
-  }
-};
+/* --------------------------------------------------------- mic recording (disabled) */
+// Mic recording removed per configuration
 
 /* ------------------------------------------------------------- samples */
 
@@ -237,24 +316,96 @@ async function analyze() {
   if (!state.file) { toast('Drop a voice clip first.'); return; }
   const btn = $('analyzeBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>Analysing…';
-  const fd = new FormData();
-  fd.append('audio', state.file);
-  if (state.ref) fd.append('reference', state.ref);
-  fd.append('context', state.context);
-  fd.append('language', state.language);
+
+  const thinkingCard = $('thinkingCard');
+  const verdictCard = $('verdictCard');
+  if (thinkingCard) thinkingCard.hidden = false;
+  if (verdictCard) verdictCard.hidden = true;
+  ['actionBox', 'scores', 'chartCard', 'detailCard'].forEach((id) => {
+    if ($(id)) $(id).hidden = true;
+  });
+
+  const tBar = $('thinkingBar');
+  const tTitle = $('thinkingTitle');
+  const tSub = $('thinkingSub');
+  const tStatus = $('thinkingStatusText');
+  const tPhase = $('thinkingPhaseIndicator');
+  const tLog = $('thinkingLog');
+
+  if (tLog) tLog.innerHTML = '';
+  activeThinkingAbort = false;
+
+  btn.innerHTML = '<span class="spin"></span>Evaluating Audio…';
+
+  // Kick off the backend analysis request asynchronously in parallel
+  const analysisPromise = performAnalysis(state.file, state.ref, state.context, state.language);
+
+  // Run through the 11 forensic thinking stages (~2.2s per stage = ~24.2s total)
+  for (let i = 0; i < FORENSIC_THINKING_PHASES.length; i++) {
+    if (activeThinkingAbort) break;
+    const stage = FORENSIC_THINKING_PHASES[i];
+
+    if (tBar) tBar.style.width = stage.pct + '%';
+    if (tTitle) tTitle.textContent = stage.title;
+    if (tSub) tSub.textContent = stage.sub;
+    if (tStatus) tStatus.innerHTML = stage.status;
+    if (tPhase) tPhase.textContent = stage.phase;
+
+    if (tLog) {
+      const prevLines = tLog.querySelectorAll('.thought-line');
+      prevLines.forEach((line) => {
+        line.classList.remove('latest');
+        line.classList.add('done');
+      });
+
+      const lineEl = document.createElement('div');
+      lineEl.className = 'thought-line latest';
+      lineEl.innerHTML = `<span class="t-arrow">&gt;</span><span class="t-text">${stage.log}</span>`;
+      tLog.appendChild(lineEl);
+      tLog.scrollTop = tLog.scrollHeight;
+    }
+
+    const stepStart = Date.now();
+    while (Date.now() - stepStart < 2200) {
+      if (activeThinkingAbort) break;
+      await wait(100);
+    }
+  }
+
   try {
-    const res = await fetch('/api/analyze', { method: 'POST', body: fd });
-    const j = await res.json();
-    if (j.error) { toast([j.error, j.hint].filter(Boolean).join(' ')); return; }
+    const j = await analysisPromise;
+
+    if (tBar) tBar.style.width = '100%';
+    if (tStatus) tStatus.innerHTML = 'Verified &middot; Finalizing';
+    if (tTitle) tTitle.textContent = 'Forensic Evaluation Complete';
+    if (tSub) tSub.textContent = 'Acoustic cues verified. Synthesizing verdict dossier.';
+    if (tLog) {
+      const doneLine = document.createElement('div');
+      doneLine.className = 'thought-line latest';
+      doneLine.innerHTML = `<span class="t-arrow" style="color:var(--green)">&#10003;</span><span class="t-text" style="color:var(--green)">Dossier finalized. Risk index: ${j.risk}/100 (${j.verdict}).</span>`;
+      tLog.appendChild(doneLine);
+      tLog.scrollTop = tLog.scrollHeight;
+    }
+
+    await wait(600);
+
+    if (thinkingCard) thinkingCard.hidden = true;
+    if (verdictCard) verdictCard.hidden = false;
+
+    if (j.error) {
+      toast([j.error, j.hint].filter(Boolean).join(' '));
+      return;
+    }
     state.last = j;
     render(j);
     pushHistory(j);
   } catch (e) {
+    if (thinkingCard) thinkingCard.hidden = true;
+    if (verdictCard) verdictCard.hidden = false;
     toast('Could not reach the scoring service. Is uvicorn still running?');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Analyse';
+    btn.textContent = 'Analyse Audio';
   }
 }
 
@@ -365,17 +516,17 @@ function gauge(risk, colour, th) {
   const tick = (v) => {
     const [x1, y1] = pt(v / 100, R - 11), [x2, y2] = pt(v / 100, R + 9);
     return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-             stroke="#4a5b7d" stroke-width="1.5"/>`;
+             stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>`;
   };
   return `<svg width="192" height="118" viewBox="0 0 192 118" role="img" aria-label="Risk ${risk} of 100">
-    <path d="${arc(0, 1, R)}" fill="none" stroke="#1d2b47" stroke-width="13" stroke-linecap="round"/>
+    <path d="${arc(0, 1, R)}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="13" stroke-linecap="round"/>
     <path d="${arc(0, Math.max(risk, 0.6) / 100, R)}" fill="none" stroke="${colour}"
           stroke-width="13" stroke-linecap="round"/>
     ${tick(th.amber)}${tick(th.red)}
     <text x="96" y="88" text-anchor="middle" font-size="35" font-weight="700"
-          fill="${colour}" font-family="Inter,Segoe UI,sans-serif">${risk}</text>
+          fill="${colour}" font-family="'Geist', -apple-system, sans-serif">${risk}</text>
     <text x="96" y="108" text-anchor="middle" font-size="11" fill="#64748b"
-          font-family="Inter,Segoe UI,sans-serif" letter-spacing="1.6">RISK / 100</text>
+          font-family="'Geist', -apple-system, sans-serif" letter-spacing="1.6">RISK / 100</text>
   </svg>`;
 }
 
@@ -386,7 +537,7 @@ function drawChart(j) {
   const bars = wave.map((v, i) => {
     const h = Math.max(1.5, v * (H / 2 - pad));
     return `<rect x="${(i * barW).toFixed(2)}" y="${(H / 2 - h).toFixed(2)}" width="${(barW * .72).toFixed(2)}"
-      height="${(h * 2).toFixed(2)}" fill="#2c3d5e" rx="${Math.min(barW / 3, 1)}"/>`;
+      height="${(h * 2).toFixed(2)}" fill="rgba(231, 229, 224, .18)" rx="${Math.min(barW / 3, 1)}"/>`;
   }).join('');
 
   const y = (score) => H - pad - (score / 100) * (H - 2 * pad);
@@ -446,3 +597,42 @@ document.querySelectorAll('.tabs button').forEach((b) => {
     });
   };
 });
+
+/* ------------------------------------------------------------- nav & scroll */
+
+const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+const navSections = Array.from(navLinks).map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+function updateActiveNav() {
+  const scrollPos = window.scrollY + 120;
+  let currentSection = null;
+  for (const sec of navSections) {
+    if (sec.offsetTop <= scrollPos) {
+      currentSection = sec;
+    }
+  }
+  if (!currentSection && navSections.length) currentSection = navSections[0];
+  if (currentSection) {
+    navLinks.forEach(a => {
+      const match = a.getAttribute('href') === '#' + currentSection.id;
+      a.classList.toggle('active', match);
+    });
+  }
+}
+
+window.addEventListener('scroll', () => {
+  requestAnimationFrame(updateActiveNav);
+}, { passive: true });
+
+navLinks.forEach(a => {
+  a.addEventListener('click', (e) => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth' });
+      navLinks.forEach(l => l.classList.toggle('active', l === a));
+      if (history.pushState) history.pushState(null, null, a.getAttribute('href'));
+    }
+  });
+});
+

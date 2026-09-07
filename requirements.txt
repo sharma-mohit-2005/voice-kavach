@@ -1,9 +1,9 @@
-# Runtime (everything the judges demo needs - no ffmpeg, no GPU, no internet)
-fastapi==0.126.0
-uvicorn==0.38.0
-numpy==2.2.4
-scipy==1.13.0
-python-multipart==0.0.21
+# Runtime (everything the demo needs - no ffmpeg, no GPU, no internet)
+fastapi>=0.115.0
+uvicorn>=0.30.0
+numpy>=2.0.0
+scipy>=1.13.0
+python-multipart>=0.0.9
 
 # Optional - only for the post-demo model upgrade documented in README.md
 # ("Where the real models plug in"). NOT required to run this app.
